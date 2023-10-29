@@ -12,9 +12,11 @@ import { TerminalTextStyle } from '../Utils/TerminalTypes';
 
 const ENTER_KEY_CODE = 13;
 const UP_ARROW_KEY_CODE = 38;
+const ON_OUTPUT = 'ON_OUTPUT';
 const ON_INPUT = 'ON_INPUT';
 
 export interface TerminalHandle {
+  getOutputEmitter: () => EventEmitter;
   printElement: (element: React.ReactElement) => void;
   printLoadingBar: (prettyEntityName: string, ref: React.RefObject<LoadingBarHandle>) => void;
   printLoadingSpinner: () => void;
@@ -45,6 +47,7 @@ function TerminalImpl({ promptCharacter }: TerminalProps, ref: React.Ref<Termina
   const heightMeasureRef = useRef(document.createElement('textarea'));
 
   const [onInputEmitter] = useState(new EventEmitter());
+  const [onOutputEmitter] = useState(new EventEmitter());
   const [fragments, setFragments] = useState<React.ReactNode[]>([]);
   const [userInputEnabled, setUserInputEnabled] = useState<boolean>(false);
   const [inputText, setInputText] = useState<string>('');
@@ -65,13 +68,15 @@ function TerminalImpl({ promptCharacter }: TerminalProps, ref: React.Ref<Termina
       setFragments((lines) => {
         return [...lines.slice(0, lines.length - n)];
       });
+      onOutputEmitter.emit(ON_OUTPUT, { type: 'remove-line' });
     },
-    [setFragments]
+    [setFragments, onOutputEmitter]
   );
 
   const newline = useCallback(() => {
     append(<br />);
-  }, [append]);
+    onOutputEmitter.emit(ON_OUTPUT, { type: 'new-line' });
+  }, [append, onOutputEmitter]);
 
   const print = useCallback(
     (str: string, style = TerminalTextStyle.Sub, onClick: (() => void) | undefined = undefined) => {
@@ -122,8 +127,9 @@ function TerminalImpl({ promptCharacter }: TerminalProps, ref: React.Ref<Termina
       }
 
       append(fragment);
+      onOutputEmitter.emit(ON_OUTPUT, { type: 'print', str });
     },
-    [append]
+    [append, onOutputEmitter]
   );
 
   const onKeyUp = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -171,6 +177,7 @@ function TerminalImpl({ promptCharacter }: TerminalProps, ref: React.Ref<Termina
   useImperativeHandle(
     ref,
     () => ({
+      getOutputEmitter: () => onOutputEmitter,
       printElement: (element: React.ReactElement) => {
         append(element);
       },
@@ -219,7 +226,16 @@ function TerminalImpl({ promptCharacter }: TerminalProps, ref: React.Ref<Termina
         setFragments([]);
       },
     }),
-    [onInputEmitter, promptCharacter, newline, print, append, removeLast, setFragments]
+    [
+      onOutputEmitter,
+      onInputEmitter,
+      promptCharacter,
+      newline,
+      print,
+      append,
+      removeLast,
+      setFragments,
+    ]
   );
 
   return (

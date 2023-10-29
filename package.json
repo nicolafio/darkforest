@@ -9,6 +9,7 @@
     "packages/*",
     "circuits",
     "client",
+    "cli",
     "eth"
   ],
   "scripts": {

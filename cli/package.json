@@ -1,0 +1,16 @@
+{
+  "name": "cli",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "prepare": "echo nothing to do",
+    "start": "node cli.js",
+    "clean": "del-cli .data node_modules"
+  },
+  "dependencies": {
+    "ethereum-hdwallet": "^0.1.2",
+    "ethereumjs-util": "^7.1.5",
+    "puppeteer": "^21.3.8",
+    "del-cli": "^4.0.1"
+  }
+}
