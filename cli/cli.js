@@ -79,7 +79,11 @@ async function main() {
   await page.focus(GAME_TERMINAL_INPUT_CSS_SELECTOR);
   await page.keyboard.press('Enter');
 
-  const input = readline.createInterface(stdin);
+  const input = readline.createInterface({
+    input: stdin,
+    output: stdout,
+    prompt: '> ',
+  });
 
   while (true) {
     stdout.write('> ');
