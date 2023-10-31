@@ -17,16 +17,18 @@ const DATA_DIR = join(__dirname, '.data');
 const GAME_TERMINAL_INPUT_CSS_SELECTOR = '[class*="Terminal"] textarea';
 
 const REQUEST_PRIVATE_KEY_COMMAND = 'id';
+const REQUEST_METRICS_COMMAND = 'meter';
+const REQUEST_BROWSER_COMMAND = 'browser';
 
 async function main() {
-  const { host, port, privateKey, requestingPrivateKey } = getParameters();
+  const parameters = getParameters();
 
-  if (requestingPrivateKey) {
-    console.log(privateKey);
+  if (parameters.requestingPrivateKey) {
+    console.log(parameters.privateKey);
     return;
   }
 
-  const privKeyBuf = Buffer.from(stripHexPrefix(privateKey), 'hex');
+  const privKeyBuf = Buffer.from(stripHexPrefix(parameters.privateKey), 'hex');
   const userAddress = addHexPrefix(bufferToHex(privateToAddress(privKeyBuf)));
   const userDataDir = join(DATA_DIR, userAddress);
 
@@ -38,7 +40,7 @@ async function main() {
   }
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: parameters.requestingBrowser ? false : 'new',
     userDataDir,
     args: ['--no-sandbox'],
   });
@@ -54,18 +56,23 @@ async function main() {
 
   const page = await browser.newPage();
 
-  await navigateToLandingPage(page, host, port);
+  await navigateToLandingPage(page, parameters.host, parameters.port);
   await enterInGameRound(page);
 
   handleUnknownErrors(page).catch(handleAsFatalError);
   handleOutOfMoneyCase(page).catch(handleAsFatalError);
   handleGameJoinFail(page).catch(handleAsFatalError);
 
-  await connectToDarkForestContract(page, privateKey);
+  await connectToDarkForestContract(page, parameters.privateKey);
 
   console.log('Connected to Dark Forest');
 
   await forwardGameTerminalOutputToStdout(page);
+
+  require('./custom-fns').init(page).catch(handleAsFatalError);
+
+  if (parameters.requestingMetrics)
+    require('./metrics').init(page, userDataDir).catch(handleAsFatalError);
 
   const sideTasksAC = new AbortController();
 
@@ -89,7 +96,7 @@ async function main() {
     stdout.write('> ');
     const line = await once(input, 'line');
     clearStdoutLine();
-    await inputLineToGameTerminal(page, line);
+    await inputLineToGameTerminal(page, `with (dfcli) { ${line} }`);
   }
 }
 
@@ -204,6 +211,8 @@ function getParameters() {
   const playerIndex = args.find((a) => /[0-9]+/.test(a));
   const playerIndexGiven = typeof playerIndex === 'string';
   const requestingPrivateKey = args.includes(REQUEST_PRIVATE_KEY_COMMAND);
+  const requestingMetrics = args.includes(REQUEST_METRICS_COMMAND);
+  const requestingBrowser = args.includes(REQUEST_BROWSER_COMMAND);
 
   if (playerIndexGiven) privateKey = getPrivateKeyFromPlayerIndex(playerIndex);
   if (!privateKey) privateKey = args.find((a) => a.startsWith('0x'));
@@ -219,6 +228,8 @@ function getParameters() {
     host,
     port,
     requestingPrivateKey,
+    requestingMetrics,
+    requestingBrowser,
   };
 }
 
